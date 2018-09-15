@@ -3,7 +3,7 @@
 
 Eine übersetzte Version findet ihr im EmpyrionPassenger/bin Verzeichnis falls ihr die Mod nicht selber prüfen und compilieren wollt ;-)
 
-Oder hier:  https://empyriononline.com/threads/mod-empyrionteleporter.39200/
+Oder hier: https://empyriononline.com/threads/mod-empyrionpassenger.44246/
 
 ### Wo für ist das?
 
@@ -65,7 +65,7 @@ English-Version:
 
 You can find a translated version in the EmpyrionPassenger / bin directory if you do not want to check and compile the mod myself ;-)
 
-Or here: https://empyriononline.com/threads/mod-empyrionteleporter.39200/
+Or here: https://empyriononline.com/threads/mod-empyrionpassenger.44246/
 
 ### What is this?
 
