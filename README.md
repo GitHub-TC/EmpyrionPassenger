@@ -8,9 +8,9 @@ Oder hier: https://empyriononline.com/threads/mod-empyrionpassenger.44246/
 ### Wo für ist das?
 
 Man fliegt mit einer Gruppe von Leuten in einem Raumschiff und muss sich ausloggen. 
-Wenn die anderen weiterfliegen befindet man sich nach einem login aber immer noch an der gleichen Position nur ist das
-Raumschiff ganz wo anders. Mit diesem Mod kann kan sich als Passagier an das Schiff binden und wird automatisch bei einem
-login an dessen aktuelle Position teleportiert.
+Wenn die anderen weiterfliegen befindet man sich nach einem Login aber immer noch an der gleichen Position nur ist das
+Raumschiff ganz wo anders. Mit diesem Mod kann kann sich als Passagier an das Schiff binden und wird automatisch bei einem
+Login an dessen aktuelle Position teleportiert.
 
 #### Wie steuert man den MOD?
 
@@ -40,7 +40,7 @@ Hinweis: Man kann sich aber auch in einem angedockten Schiff befinden und nur mi
 ### Konfiguration
 Eine Konfiguration kann man in der Datei (wird beim ersten Start automatisch erstellt)
 
-[Empyrion Directory]\Saves\Games\[SaveGameName]\Mods\EmpyrionPassenger\PassengersDB.xml
+[Empyrion Directory]\Saves\Games\[SaveGameName]\Mods\EmpyrionPassenger\PassengersDB.json
 
 vornehmen.
 
@@ -80,29 +80,29 @@ All commands only work in faction chat!
 
 #### Help
 
-* / pass help: Displays the commands of the mod
+* /pass help: Displays the commands of the mod
 
 #### Teleport
 
-* / pass => Passenger set up when piloting the ship
-* / pass <Id> => Passenger set up to the structure with the <Id> - this must be in the same faction
-* / pass help => list of commands
-* / pass back => If a teleport should be counterfeit, the player can be teleported back to the position BEFORE the teleport
-* / pass delete <Id> => Deletes all passenger information from to the ship <Id>
-* / pass list <Id> => Lists all passengers from <Id>
-* / pass listall => Lists all passenger information (only allowed from moderator)
-* / pass cleanup => Deletes all passenger information leading to deleted structures (only allowed from moderator)
+* /pass => Passenger set up when piloting the ship
+* /pass <Id> => Passenger set up to the structure with the <Id> - this must be in the same faction
+* /pass help => list of commands
+* /pass back => If a teleport should be counterfeit, the player can be teleported back to the position BEFORE the teleport
+* /pass delete <Id> => Deletes all passenger information from to the ship <Id>
+* /pass list <Id> => Lists all passengers from <Id>
+* /pass listall => Lists all passenger information (only allowed from moderator)
+* /pass cleanup => Deletes all passenger information leading to deleted structures (only allowed from moderator)
 
 Example:
-- As a pilot of the CV 4004: / pass
-- As a normal passenger of the CV: / pass 4004
+- As a pilot of the CV 4004: /pass
+- As a normal passenger of the CV: /pass 4004
 
-Note: You can also be in a docked ship and register your passenger status only with the / pass command
+Note: You can also be in a docked ship and register your passenger status only with the /pass command
 
 ### Configuration
 A configuration can be found in the file (automatically created on first startup)
 
-[Empyrion Directory]\Saves\Games\\[SaveGameName]\Mods\EmpyrionPassenger\PassengersDB.xml
+[Empyrion Directory]\Saves\Games\\[SaveGameName]\Mods\EmpyrionPassenger\PassengersDB.json
 
 make.
 

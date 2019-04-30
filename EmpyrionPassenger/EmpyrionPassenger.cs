@@ -1,15 +1,17 @@
 ﻿using System;
 using Eleon.Modding;
-using EmpyrionAPITools;
 using System.Collections.Generic;
-using EmpyrionAPIDefinitions;
 using System.Linq;
-using System.Numerics;
 using System.Reflection;
 using System.Threading;
 using System.IO;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using EmpyrionNetAPIAccess;
+using EmpyrionNetAPIDefinitions;
+using System.Threading.Tasks;
+using System.Numerics;
+using EmpyrionNetAPITools;
 
 namespace EmpyrionPassenger
 {
@@ -32,7 +34,7 @@ namespace EmpyrionPassenger
 
     }
 
-    public partial class EmpyrionPassenger : SimpleMod
+    public class EmpyrionPassenger : EmpyrionModBase
     {
         public ModGameAPI GameAPI { get; set; }
         public int SourceId { get; private set; }
@@ -50,7 +52,10 @@ namespace EmpyrionPassenger
 
         public string PassengersDBFilename { get; set; }
 
-        FileSystemWatcher DBFileChangedWatcher;
+        public EmpyrionPassenger()
+        {
+            EmpyrionConfiguration.ModName = "EmpyrionPassenger";
+        }
 
         enum SubCommand
         {
@@ -68,71 +73,46 @@ namespace EmpyrionPassenger
         {
             GameAPI = aGameAPI;
             verbose = true;
-            this.LogLevel = LogLevel.Message;
+            LogLevel = LogLevel.Message;
 
             log($"**HandleEmpyrionPassenger loaded: {string.Join(" ", Environment.GetCommandLineArgs())}", LogLevel.Message);
 
             InitializeDB();
-            InitializeDBFileWatcher();
 
-            Event_Player_Connected    += EmpyrionPassenger_Event_Player_Connected;
-            Event_Player_Disconnected += EmpyrionPassenger_Event_Player_Disconnected;
+            Event_Player_Connected += async (P) => await EmpyrionPassenger_Event_Player_Connected(P);
 
             ChatCommands.Add(new ChatCommand(@"/pass",                           (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers als pilot of vessel"));
-            ChatCommands.Add(new ChatCommand(@"/pass (?<Id>\d+)",                (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers manually and if not pilot with vessel ID"));
+            ChatCommands.Add(new ChatCommand(@"/pass (?<ID>\d+)",                (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers manually and if not pilot with vessel ID"));
             ChatCommands.Add(new ChatCommand(@"/pass exec",                      (I, A) => ExecCommand(SubCommand.Teleport,  I, A), "Execute teleport"));
             ChatCommands.Add(new ChatCommand(@"/pass help",                      (I, A) => ExecCommand(SubCommand.Help,      I, A), "Display help"));
             ChatCommands.Add(new ChatCommand(@"/pass back",                      (I, A) => ExecCommand(SubCommand.Back,      I, A), "Teleports the player back to the last (good) position"));
-            ChatCommands.Add(new ChatCommand(@"/pass delete (?<SourceId>\d+)",   (I, A) => ExecCommand(SubCommand.Delete,    I, A), "Delete all teleportdata from {SourceId}"));
-            ChatCommands.Add(new ChatCommand(@"/pass list (?<Id>\d+)",           (I, A) => ExecCommand(SubCommand.List,      I, A), "List all teleportdata from {Id}"));
+            ChatCommands.Add(new ChatCommand(@"/pass delete (?<ID>\d+)",         (I, A) => ExecCommand(SubCommand.Delete,    I, A), "Delete all teleportdata from {ID}"));
+            ChatCommands.Add(new ChatCommand(@"/pass list (?<ID>\d+)",           (I, A) => ExecCommand(SubCommand.List,      I, A), "List all teleportdata from {ID}"));
             ChatCommands.Add(new ChatCommand(@"/pass listall",                   (I, A) => ExecCommand(SubCommand.ListAll,   I, A), "List all teleportdata", PermissionType.Moderator));
             ChatCommands.Add(new ChatCommand(@"/pass cleanup",                   (I, A) => ExecCommand(SubCommand.CleanUp,   I, A), "Removes all teleportdata to deleted structures", PermissionType.Moderator));
         }
 
-        private void EmpyrionPassenger_Event_Player_Disconnected(Id aPlayer)
+        private async Task EmpyrionPassenger_Event_Player_Connected(Id aPlayer)
         {
-            SavePassengersDestination(aPlayer.id, 0);
-        }
-
-        private void EmpyrionPassenger_Event_Player_Connected(Id aPlayer)
-        {
-            TeleportPlayer(aPlayer.id);
-        }
-
-        private void InitializeDBFileWatcher()
-        {
-            DBFileChangedWatcher = new FileSystemWatcher
-            {
-                Path = Path.GetDirectoryName(PassengersDBFilename),
-                NotifyFilter = NotifyFilters.LastWrite,
-                Filter = Path.GetFileName(PassengersDBFilename)
-            };
-            DBFileChangedWatcher.Changed += (s, e) => PassengersDB = PassengerDB.ReadDB(PassengersDBFilename);
-            DBFileChangedWatcher.EnableRaisingEvents = true;
+            await TeleportPlayer(aPlayer.id);
         }
 
         private void InitializeDB()
         {
-            PassengersDBFilename = Path.Combine(EmpyrionConfiguration.ProgramPath, @"Saves\Games\" + EmpyrionConfiguration.DedicatedYaml.SaveGameName + @"\Mods\EmpyrionPassenger\PassengersDB.xml");
-            Directory.CreateDirectory(Path.GetDirectoryName(PassengersDBFilename));
-
-            // Move DB file to new location
-            var OldDB = Path.Combine(Directory.GetCurrentDirectory(), @"Content\Mods\EmpyrionPassenger\PassengersDB.xml");
-            if (File.Exists(OldDB)) File.Move(OldDB, PassengersDBFilename);
+            PassengersDBFilename = Path.Combine(EmpyrionConfiguration.SaveGameModPath, "Passengers.json");
 
             PassengerDB.LogDB = log;
-            PassengersDB = PassengerDB.ReadDB(PassengersDBFilename);
-            PassengersDB.SaveDB(PassengersDBFilename);
+            PassengersDB = new PassengerDB(PassengersDBFilename);
         }
 
 
         enum ChatType
         {
-            Global = 3,
+            Global  = 3,
             Faction = 5,
         }
 
-        private void ExecCommand(SubCommand aCommand, ChatInfo info, Dictionary<string, string> args)
+        private async Task ExecCommand(SubCommand aCommand, ChatInfo info, Dictionary<string, string> args)
         {
             log($"**HandleEmpyrionPassenger {info.type}#{aCommand}:{info.msg} {args.Aggregate("", (s, i) => s + i.Key + "/" + i.Value + " ")}", LogLevel.Message);
 
@@ -140,117 +120,94 @@ namespace EmpyrionPassenger
 
             switch (aCommand)
             {
-                case SubCommand.Help    : DisplayHelp(info.playerId); break;
-                case SubCommand.Back    : ExecTeleportPlayerBack(info.playerId); break;
-                case SubCommand.Delete  : DeletePassengers(info.playerId, getIntParam(args, "SourceId")); break;
-                case SubCommand.List    : ListTeleporterRoutes(info.playerId, getIntParam(args, "Id")); break;
-                case SubCommand.ListAll : ListAllPassengers(info.playerId); break;
-                case SubCommand.CleanUp : CleanUpTeleporterRoutes(info.playerId); break;
-                case SubCommand.Save    : SavePassengersDestination(info.playerId, getIntParam(args, "Id")); break;
-                case SubCommand.Teleport: TeleportPlayer(info.playerId); break;
+                case SubCommand.Help    : await DisplayHelp                   (info.playerId); break;
+                case SubCommand.Back    : await ExecTeleportPlayerBack        (info.playerId); break;
+                case SubCommand.Delete  : await DeletePassengers              (info.playerId, getIntParam(args, "ID")); break;
+                case SubCommand.List    : await ListTeleporterRoutes          (info.playerId, getIntParam(args, "ID")); break;
+                case SubCommand.ListAll : await ListAllPassengers             (info.playerId); break;
+                case SubCommand.CleanUp : await CleanUpTeleporterRoutes       (info.playerId); break;
+                case SubCommand.Save    : await SavePassengersDestination     (info.playerId, getIntParam(args, "ID")); break;
+                case SubCommand.Teleport: await TeleportPlayer                (info.playerId); break;
             }
         }
 
-        private void CleanUpTeleporterRoutes(int aPlayerId)
+        private async Task CleanUpTeleporterRoutes(int aPlayerId)
         {
-            Request_GlobalStructure_List(G => {
-                var GlobalFlatIdList = G.globalStructures.Aggregate(new List<int>(), (L, P) => { L.AddRange(P.Value.Select(S => S.id)); return L; });
-                var TeleporterFlatIdList = PassengersDB.PassengersDestinations.Aggregate(new List<int>(), (L, P) => { L.Add(P.Destination.Id); return L; });
+            var G = await Request_GlobalStructure_List();
+            
+            var GlobalFlatIdList = G.globalStructures.Aggregate(new List<int>(), (L, P) => { L.AddRange(P.Value.Select(S => S.id)); return L; });
+            var TeleporterFlatIdList = PassengersDB.Configuration.Current.PassengersDestinations.Aggregate(new List<int>(), (L, P) => { L.Add(P.Destination.Id); return L; });
 
-                var DeleteList = TeleporterFlatIdList.Where(I => !GlobalFlatIdList.Contains(I)).Distinct();
-                var DelCount = DeleteList.Aggregate(0, (C, I) => C + PassengersDB.Delete(I));
-                log($"CleanUpPassengers: {DelCount} Structures: {DeleteList.Aggregate("", (S, I) => S + "," + I)}", LogLevel.Message);
-                InformPlayer(aPlayerId, $"CleanUp: {DelCount} Passengers");
+            var DeleteList = TeleporterFlatIdList.Where(I => !GlobalFlatIdList.Contains(I)).Distinct();
+            var DelCount = DeleteList.Aggregate(0, (C, I) => C + PassengersDB.Delete(I));
+            log($"CleanUpPassengers: {DelCount} Structures: {DeleteList.Aggregate("", (S, I) => S + "," + I)}", LogLevel.Message);
+            InformPlayer(aPlayerId, $"CleanUp: {DelCount} Passengers");
 
-                if (DelCount > 0) SaveTeleporterDB();
-            });
+            if (DelCount > 0) PassengersDB.Configuration.Save();
         }
 
-        private void TeleportPlayer(int aPlayerId)
+        private async Task TeleportPlayer(int aPlayerId)
         {
-            Request_GlobalStructure_List(G =>
-                Request_Player_Info(aPlayerId.ToId(), P => {
-                    ExecTeleportPlayer(G, P, aPlayerId);
-                }));
+            var G = await Request_GlobalStructure_List();
+            var P = await Request_Player_Info(aPlayerId.ToId());
+
+            await ExecTeleportPlayer(G, P, aPlayerId);
         }
 
-        private void SavePassengersDestination(int aPlayerId, int aVesselId)
+        private async Task SavePassengersDestination(int aPlayerId, int aVesselId)
         {
-            Request_GlobalStructure_List(G =>
+            var G = await Request_GlobalStructure_List();
+            var P = await Request_Player_Info(aPlayerId.ToId());
+
+            var PilotVessel = G.globalStructures
+                .Select(GPL => GPL.Value?
+                    .FirstOrDefault(S => (S.pilotId   == P.entityId && aVesselId == 0) || 
+                                         ((S.factionId == P.factionId || P.permission >= (int)PermissionType.Moderator) && S.id == aVesselId)))
+                .Where(S => S.Value.id != 0)
+                .Select(S => S.Value)
+                .FirstOrDefault();
+
+            if (PilotVessel.id == 0) {
+                log($"{P.playerName}({P.entityId}): Not pilot of a vessel!");
+                AlertPlayer(P.entityId, $"Not pilot of a vessel! Wait a minute or use '/pass [VesselID]'");
+            }
+            else
             {
-                //log("G:" + G.globalStructures
-                //    .Aggregate("", (s, p) => s + p.Key + ":" +
-                //    p.Value?.Aggregate("", (ss, pp) => $"{ss} {pp.id}/{pp.name}({pp.pilotId})")), LogLevel.Error);
-
-                Request_Player_Info(aPlayerId.ToId(), (P) =>
-                {
-                    var PilotVessel = G.globalStructures
-                        .Select(GPL => GPL.Value?
-                            .FirstOrDefault(S => S.pilotId == P.entityId || (S.factionId == P.factionId && S.id == aVesselId)))
-                        .Where(S => S.Value.id != 0)
-                        .Select(S => S.Value)
-                        .FirstOrDefault();
-
-                    if (PilotVessel.id == 0) {
-                        log($"{P.playerName}({P.entityId}): Not pilot of a vessel!");
-                        AlertPlayer(P.entityId, $"Not pilot of a vessel! Wait a minute or use '/pass [VesselID]'");
-                    }
-                    else
-                    {
-                        PassengersDB.AddPassenderDestination(G, PilotVessel.id, P);
-                        SaveTeleporterDB();
-                        log($"{P.playerName}({P.entityId}): Passenger set to '{PilotVessel.name}' ({PilotVessel.id})");
-                        ShowDialog(aPlayerId, P, "Passengers", $"\nPassenger set to '{PilotVessel.name}' ({PilotVessel.id})");
-                    }
-                });
-            });
+                PassengersDB.AddPassenderDestination(G, PilotVessel.id, P);
+                PassengersDB.Configuration.Save();
+                log($"{P.playerName}({P.entityId}): Passenger set to '{PilotVessel.name}' ({PilotVessel.id})");
+                await ShowDialog(aPlayerId, P, "Passengers", $"\nPassenger set to '{PilotVessel.name}' ({PilotVessel.id})");
+            }
         }
 
-        private void SaveTeleporterDB()
-        {
-            DBFileChangedWatcher.EnableRaisingEvents = false;
-            PassengersDB.SaveDB(PassengersDBFilename);
-            DBFileChangedWatcher.EnableRaisingEvents = true;
-        }
-
-        private void ListAllPassengers(int aPlayerId)
+        private async Task ListAllPassengers(int aPlayerId)
         {
             var Timer = new Stopwatch();
             Timer.Start();
+            var G = await Request_GlobalStructure_List();
+            Timer.Stop();
 
-            Request_GlobalStructure_List(G =>
-            {
-                Timer.Stop();
-                Request_Player_Info(aPlayerId.ToId(), (P) =>
-                {
-                    ShowDialog(aPlayerId, P, $"Passengers (Playfields #{G.globalStructures.Count} Structures #{G.globalStructures.Aggregate(0, (c, p) => c + p.Value.Count)} load {Timer.Elapsed.TotalMilliseconds:N2}ms)", PassengersDB.PassengersDestinations.OrderBy(T => T.PassengerName).Aggregate("\n", (S, T) => S + T.ToString(G) + "\n"));
-                });
-            });
+            var P = await Request_Player_Info(aPlayerId.ToId());
+            await ShowDialog(aPlayerId, P, $"Passengers (Playfields #{G.globalStructures.Count} Structures #{G.globalStructures.Aggregate(0, (c, p) => c + p.Value.Count)} load {Timer.Elapsed.TotalMilliseconds:N2}ms)", PassengersDB.Configuration.Current.PassengersDestinations.OrderBy(T => T.PassengerName).Aggregate("\n", (S, T) => S + T.ToString(G) + "\n"));
         }
 
-        private void DeletePassengers(int aPlayerId, int aSourceId)
+        private async Task DeletePassengers(int aPlayerId, int aSourceId)
         {
-            Request_Player_Info(aPlayerId.ToId(), (P) =>
-            {
-                var deletedCount = PassengersDB.Delete(aSourceId);
-                SaveTeleporterDB();
+            var P = await Request_Player_Info(aPlayerId.ToId());
+            var deletedCount = PassengersDB.Delete(aSourceId);
+            PassengersDB.Configuration.Save();
 
-                AlertPlayer(P.entityId, $"Delete {deletedCount} passenger from {aSourceId}");
-            });
+            AlertPlayer(P.entityId, $"Delete {deletedCount} passenger from {aSourceId}");
         }
 
-        private void ListTeleporterRoutes(int aPlayerId, int aStructureId)
+        private async Task ListTeleporterRoutes(int aPlayerId, int aStructureId)
         {
-            Request_GlobalStructure_List(G =>
-            {
-                Request_Player_Info(aPlayerId.ToId(), (P) =>
-                {
-                    ShowDialog(aPlayerId, P, "Passengers", PassengersDB.List(aStructureId, P).OrderBy(T => T.PassengerName).Aggregate("\n", (S, T) => S + T.ToString(G) + "\n"));
-                });
-            });
+            var G = await Request_GlobalStructure_List();
+            var P = await Request_Player_Info(aPlayerId.ToId());
+            await ShowDialog(aPlayerId, P, "Passengers", PassengersDB.List(aStructureId, P).OrderBy(T => T.PassengerName).Aggregate("\n", (S, T) => S + T.ToString(G) + "\n"));
         }
 
-    private bool ExecTeleportPlayer(GlobalStructureList aGlobalStructureList, PlayerInfo aPlayer, int aPlayerId)
+        private async Task<bool> ExecTeleportPlayer(GlobalStructureList aGlobalStructureList, PlayerInfo aPlayer, int aPlayerId)
         {
             var FoundRoute = PassengersDB.SearchRoute(aGlobalStructureList, aPlayer);
             if (FoundRoute == null)
@@ -263,7 +220,7 @@ namespace EmpyrionPassenger
             {
                 log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> near logout vessel pos={GetVector3(aPlayer.pos).String()} on '{aPlayer.playfield}'", LogLevel.Message);
                 PassengersDB.DeletePassenger(aPlayer.entityId);
-                SaveTeleporterDB();
+                PassengersDB.Configuration.Save();
                 return false;
             }
 
@@ -272,29 +229,47 @@ namespace EmpyrionPassenger
             if (!PlayerLastGoodPosition.ContainsKey(aPlayer.entityId)) PlayerLastGoodPosition.Add(aPlayer.entityId, null);
             PlayerLastGoodPosition[aPlayer.entityId] = new IdPlayfieldPositionRotation(aPlayer.entityId, aPlayer.playfield, aPlayer.pos, aPlayer.rot);
 
-            Action<PlayerInfo> ActionTeleportPlayer = (P) =>
+            Action<PlayerInfo> ActionTeleportPlayer = async (P) =>
             {
-                if (FoundRoute.Playfield == P.playfield) Request_Entity_Teleport         (new IdPositionRotation(aPlayer.entityId, GetVector3(FoundRoute.Position), GetVector3(FoundRoute.Rotation)),                               null, (E) => InformPlayer(aPlayerId, "Entity_Teleport: {E}"));
-                else                                     Request_Player_ChangePlayerfield(new IdPlayfieldPositionRotation(aPlayer.entityId, FoundRoute.Playfield, GetVector3(FoundRoute.Position), GetVector3(FoundRoute.Rotation)),null, (E) => InformPlayer(aPlayerId, "Player_ChangePlayerfield: {E}"));
+                if (FoundRoute.Playfield == P.playfield)
+                    try
+                    {
+                        await Request_Entity_Teleport(new IdPositionRotation(aPlayer.entityId, GetVector3(FoundRoute.Position), GetVector3(FoundRoute.Rotation)));
+                    }
+                    catch (Exception error)
+                    {
+                        InformPlayer(aPlayerId, $"Entity_Teleport: {error}");
+                    }
+                else
+                {
+                    try
+                    {
+                        await Request_Player_ChangePlayerfield(new IdPlayfieldPositionRotation(aPlayer.entityId, FoundRoute.Playfield, GetVector3(FoundRoute.Position), GetVector3(FoundRoute.Rotation)));
+                    }
+                    catch (Exception error)
+                    {
+                        InformPlayer(aPlayerId, $"Player_ChangePlayerfield: {error}");
+                    }
+                }
             };
 
-            Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aPlayer.entityId, health = (int)aPlayer.healthMax });
+            await Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aPlayer.entityId, health = (int)aPlayer.healthMax });
 
             new Thread(new ThreadStart(() =>
             {
                 var TryTimer = new Stopwatch();
                 TryTimer.Start();
-                while (TryTimer.ElapsedMilliseconds < (PassengersDB.Configuration.PreparePlayerForTeleport * 1000))
+                while (TryTimer.ElapsedMilliseconds < (PassengersDB.Configuration.Current.PreparePlayerForTeleport * 1000))
                 {
                     Thread.Sleep(2000);
-                    var WaitTime = PassengersDB.Configuration.PreparePlayerForTeleport - (int)(TryTimer.ElapsedMilliseconds / 1000);
+                    var WaitTime = PassengersDB.Configuration.Current.PreparePlayerForTeleport - (int)(TryTimer.ElapsedMilliseconds / 1000);
                     InformPlayer(aPlayerId, $"Prepare for teleport in {WaitTime} sec.");
                 }
 
                 ActionTeleportPlayer(aPlayer);
                 CheckPlayerStableTargetPos(aPlayerId, aPlayer, ActionTeleportPlayer, FoundRoute.Position);
                 PassengersDB.DeletePassenger(aPlayer.entityId);
-                SaveTeleporterDB();
+                PassengersDB.Configuration.Save();
             })).Start();
 
             return true;
@@ -302,42 +277,47 @@ namespace EmpyrionPassenger
 
         private void CheckPlayerStableTargetPos(int aPlayerId, PlayerInfo aCurrentPlayerInfo, Action<PlayerInfo> ActionTeleportPlayer, Vector3 aTargetPos)
         {
-            new Thread(new ThreadStart(() =>
+            new Thread(new ThreadStart(async () =>
             {
                 PlayerInfo LastPlayerInfo = aCurrentPlayerInfo;
                 var TryTimer = new Stopwatch();
                 TryTimer.Start();
-                while (TryTimer.ElapsedMilliseconds < (PassengersDB.Configuration.HoldPlayerOnPositionAfterTeleport * 1000))
+                while (TryTimer.ElapsedMilliseconds < (PassengersDB.Configuration.Current.HoldPlayerOnPositionAfterTeleport * 1000))
                 {
                     Thread.Sleep(2000);
-                    var WaitTime = PassengersDB.Configuration.HoldPlayerOnPositionAfterTeleport - (int)(TryTimer.ElapsedMilliseconds / 1000);
-                    Request_Player_Info(aPlayerId.ToId(), P => {
+                    var WaitTime = PassengersDB.Configuration.Current.HoldPlayerOnPositionAfterTeleport - (int)(TryTimer.ElapsedMilliseconds / 1000);
+                    try
+                    {
+                        var P = await Request_Player_Info(aPlayerId.ToId());
                         LastPlayerInfo = P;
-                        if(WaitTime > 0) InformPlayer(aPlayerId, $"Target reached please wait for {WaitTime} sec.");
-                    }, (E) => InformPlayer(aPlayerId, "Target reached. {E}"));
+                        if (WaitTime > 0) InformPlayer(aPlayerId, $"Target reached please wait for {WaitTime} sec.");
+                    }
+                    catch (Exception error)
+                    {
+                        InformPlayer(aPlayerId, $"Target reached. {error}");
+                    }
                 }
                 if (Vector3.Distance(GetVector3(LastPlayerInfo.pos), aTargetPos) > 3) ActionTeleportPlayer(LastPlayerInfo);
-                Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aCurrentPlayerInfo.entityId, health = (int)aCurrentPlayerInfo.healthMax });
+                await Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aCurrentPlayerInfo.entityId, health = (int)aCurrentPlayerInfo.healthMax });
                 InformPlayer(aPlayerId, $"Thank you for traveling with the EmpyrionPassenger :-)");
             })).Start();
         }
 
-        private void ExecTeleportPlayerBack(int aPlayerId)
+        private async Task ExecTeleportPlayerBack(int aPlayerId)
         {
-            Request_Player_Info(aPlayerId.ToId(), P => {
+            var P = await Request_Player_Info(aPlayerId.ToId());
 
-                if (!PlayerLastGoodPosition.ContainsKey(P.entityId))
-                {
-                    InformPlayer(aPlayerId, "No back teleport available.");
-                    return;
-                }
+            if (!PlayerLastGoodPosition.ContainsKey(P.entityId))
+            {
+                InformPlayer(aPlayerId, "No back teleport available.");
+                return;
+            }
 
-                var LastGoodPos = PlayerLastGoodPosition[P.entityId];
-                PlayerLastGoodPosition.Remove(P.entityId);
+            var LastGoodPos = PlayerLastGoodPosition[P.entityId];
+            PlayerLastGoodPosition.Remove(P.entityId);
 
-                if (LastGoodPos.playfield == P.playfield) Request_Entity_Teleport(new IdPositionRotation(P.entityId, LastGoodPos.pos, LastGoodPos.rot));
-                else Request_Player_ChangePlayerfield(LastGoodPos);
-            });
+            if (LastGoodPos.playfield == P.playfield) await Request_Entity_Teleport(new IdPositionRotation(P.entityId, LastGoodPos.pos, LastGoodPos.rot));
+            else                                      await Request_Player_ChangePlayerfield(LastGoodPos);
         }
 
         public static Vector3 GetVector3(PVector3 aVector)
@@ -366,28 +346,9 @@ namespace EmpyrionPassenger
             return value;
         }
 
-        void ShowDialog(int aPlayerId, PlayerInfo aPlayer, string aTitle, string aMessage)
+        private async Task DisplayHelp(int aPlayerId)
         {
-            Request_ShowDialog_SinglePlayer(new DialogBoxData()
-            {
-                Id      = aPlayerId,
-                MsgText = $"{aTitle}: [c][ffffff]{aPlayer.playerName}[-][/c] with permission [c][ffffff]{(PermissionType)aPlayer.permission}[-][/c]\n" + aMessage,
-            });
-        }
-
-        private void DisplayHelp(int aPlayerId)
-        {
-            Request_Player_Info(aPlayerId.ToId(), (P) =>
-            {
-                var CurrentAssembly = Assembly.GetAssembly(this.GetType());
-                //[c][hexid][-][/c]    [c][019245]test[-][/c].
-
-                ShowDialog(aPlayerId, P, "Commands",
-                    "\n" + String.Join("\n", GetChatCommandsForPermissionLevel((PermissionType)P.permission).Select(C => C.MsgString()).ToArray()) +
-                    PassengersDB.Configuration.AllowedStructures.Aggregate("\n\n[c][00ffff]Passengers allowed at:[-][/c]", (s, a) => s + $"\n {a.EntityType}") +
-                    $"\n\n[c][c0c0c0]{CurrentAssembly.GetAttribute<AssemblyTitleAttribute>()?.Title} by {CurrentAssembly.GetAttribute<AssemblyCompanyAttribute>()?.Company} Version:{CurrentAssembly.GetAttribute<AssemblyFileVersionAttribute>()?.Version}[-][/c]"
-                    );
-            });
+            await DisplayHelp(aPlayerId, PassengersDB.Configuration.Current.AllowedStructures.Aggregate("\n\n[c][00ffff]Passengers allowed at:[-][/c]", (s, a) => s + $"\n {a.EntityType}"));
         }
 
     }

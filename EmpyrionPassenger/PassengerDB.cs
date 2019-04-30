@@ -6,7 +6,10 @@ using System.Xml.Serialization;
 using System.Xml;
 using System.Linq;
 using System.Numerics;
-using EmpyrionAPIDefinitions;
+using EmpyrionNetAPIDefinitions;
+using EmpyrionNetAPITools;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 
 namespace EmpyrionPassenger
 {
@@ -20,15 +23,6 @@ namespace EmpyrionPassenger
             public override string ToString()
             {
                 return $"Id:[c][ffffff]{Id}[-][/c] relpos=[c][ffffff]{Position.String()}[-][/c]";
-            }
-        }
-
-        public class TeleporterTargetData : TeleporterData
-        {
-            public string Playfield { get; set; }
-            public override string ToString()
-            {
-                return $"Id:[c][ffffff]{Id}/[c][ffffff]{Playfield}[-][/c] relpos=[c][ffffff]{Position.String()}[-][/c]";
             }
         }
 
@@ -52,8 +46,46 @@ namespace EmpyrionPassenger
             }
         }
 
-        public Configuration Configuration { get; set; } = new Configuration();
-        public List<TeleporterRoute> PassengersDestinations { get; set; } = new List<TeleporterRoute>();
+        public class AllowedStructure
+        {
+            [JsonConverter(typeof(StringEnumConverter))]
+            public EntityType EntityType { get; set; }
+        }
+
+        public class ConfigurationAndDB
+        {
+            public int PreparePlayerForTeleport { get; set; } = 10;
+            public int HoldPlayerOnPositionAfterTeleport { get; set; } = 20;
+            public AllowedStructure[] AllowedStructures { get; set; } = new AllowedStructure[]
+                {
+                new AllowedStructure(){ EntityType = EntityType.HV },
+                new AllowedStructure(){ EntityType = EntityType.SV },
+                new AllowedStructure(){ EntityType = EntityType.CV },
+                };
+            public List<TeleporterRoute> PassengersDestinations { get; set; } = new List<TeleporterRoute>();
+        }
+
+        public ConfigurationManager<ConfigurationAndDB> Configuration { get; set; }
+
+        public PassengerDB(string configurationFilename)
+        {
+            Configuration = new ConfigurationManager<ConfigurationAndDB>() {
+                ConfigFilename = configurationFilename
+            };
+
+            Configuration.Load();
+            Configuration.Save();
+        }
+
+        public class TeleporterTargetData : TeleporterData
+        {
+            public string Playfield { get; set; }
+            public override string ToString()
+            {
+                return $"Id:[c][ffffff]{Id}/[c][ffffff]{Playfield}[-][/c] relpos=[c][ffffff]{Position.String()}[-][/c]";
+            }
+        }
+
         public static Action<string, LogLevel> LogDB { get; set; }
 
         private static void log(string aText, LogLevel aLevel)
@@ -74,14 +106,14 @@ namespace EmpyrionPassenger
             RelativePos = Vector3.Transform(RelativePos, EntityRot);
             RelativePos = new Vector3(RelativePos.X, ((float)Math.Round(RelativePos.Y + 1.9) - 1), RelativePos.Z);
 
-            var Target = PassengersDestinations.FirstOrDefault(P => P.PassengerId == aPlayer.entityId);
-            if (Target == null) PassengersDestinations.Add(Target = new TeleporterRoute());
+            var Target = Configuration.Current.PassengersDestinations.FirstOrDefault(P => P.PassengerId == aPlayer.entityId);
+            if (Target == null) Configuration.Current.PassengersDestinations.Add(Target = new TeleporterRoute());
 
             Target.PassengerId   = aPlayer.entityId;
             Target.PassengerName = aPlayer.playerName;
             Target.Destination   = new TeleporterData() { Id = aVesselId, Position = RelativePos, Rotation = NormRot };
 
-            PassengersDestinations = PassengersDestinations.OrderBy(T => T.PassengerName).ToList();
+            Configuration.Current.PassengersDestinations = Configuration.Current.PassengersDestinations.OrderBy(T => T.PassengerName).ToList();
         }
 
         public class PlayfieldStructureInfo
@@ -102,27 +134,27 @@ namespace EmpyrionPassenger
 
         public int Delete(int aSourceId)
         {
-            var OldCount = PassengersDestinations.Count();
-            PassengersDestinations = PassengersDestinations
+            var OldCount = Configuration.Current.PassengersDestinations.Count();
+            Configuration.Current.PassengersDestinations = Configuration.Current.PassengersDestinations
                 .Where(T => T.Destination.Id != aSourceId)
                 .ToList();
 
-            return OldCount - PassengersDestinations.Count();
+            return OldCount - Configuration.Current.PassengersDestinations.Count();
         }
 
         public int DeletePassenger(int aPlayerId)
         {
-            var OldCount = PassengersDestinations.Count();
-            PassengersDestinations = PassengersDestinations
+            var OldCount = Configuration.Current.PassengersDestinations.Count();
+            Configuration.Current.PassengersDestinations = Configuration.Current.PassengersDestinations
                 .Where(T => T.PassengerId != aPlayerId)
                 .ToList();
 
-            return OldCount - PassengersDestinations.Count();
+            return OldCount - Configuration.Current.PassengersDestinations.Count();
         }
 
         public IEnumerable<TeleporterRoute> List(int aStructureId, PlayerInfo aPlayer)
         {
-            return PassengersDestinations.Where(T => (T.Destination.Id == aStructureId));
+            return Configuration.Current.PassengersDestinations.Where(T => (T.Destination.Id == aStructureId));
         }
 
         TeleporterTargetData GetCurrentTeleportTargetPosition(GlobalStructureList aGlobalStructureList, TeleporterData aTarget)
@@ -152,44 +184,10 @@ namespace EmpyrionPassenger
         {
             //log($"T:{TeleporterRoutes.Aggregate("", (s, t) => s + " " + t.ToString())} => {aGlobalStructureList.globalStructures.Aggregate("", (s, p) => s + p.Key + ":" + p.Value.Aggregate("", (ss, pp) => ss + " " + pp.id + "/" + pp.name))}");
 
-            return PassengersDestinations
+            return Configuration.Current.PassengersDestinations
                 .Where(D => D.PassengerId == aPlayer.entityId)
                 .Select(I => GetCurrentTeleportTargetPosition(aGlobalStructureList, I.Destination))
                 .FirstOrDefault();
-        }
-
-        public void SaveDB(string DBFileName)
-        {
-            var serializer = new XmlSerializer(typeof(PassengerDB));
-            Directory.CreateDirectory(Path.GetDirectoryName(DBFileName));
-            using (var writer = XmlWriter.Create(DBFileName, new XmlWriterSettings() { Indent = true, IndentChars = "  " }))
-            {
-                serializer.Serialize(writer, this);
-            }
-        }
-
-        public static PassengerDB ReadDB(string DBFileName)
-        {
-            if (!File.Exists(DBFileName))
-            {
-                log($"PassengerDB ReadDB not found '{DBFileName}'", LogLevel.Error);
-                return new PassengerDB();
-            }
-
-            try
-            {
-                log($"PassengerDB ReadDB load '{DBFileName}'", LogLevel.Message);
-                var serializer = new XmlSerializer(typeof(PassengerDB));
-                using (var reader = XmlReader.Create(DBFileName))
-                {
-                    return (PassengerDB)serializer.Deserialize(reader);
-                }
-            }
-            catch(Exception Error)
-            {
-                log("PassengerDB ReadDB" + Error.ToString(), LogLevel.Error);
-                return new PassengerDB();
-            }
         }
 
         public static Vector3 GetVector3(PVector3 aVector)
