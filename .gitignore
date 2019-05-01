@@ -4,7 +4,6 @@
 # build
 [Oo]bj/
 [Bb]in/*
-![Bb]in/EmpyrionTeleporter.dll
 [Dd]ebug/
 packages/
 TestResults/
