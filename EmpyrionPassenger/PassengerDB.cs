@@ -202,7 +202,10 @@ namespace EmpyrionPassenger
 
         public static Matrix4x4 GetMatrix4x4(Vector3 aVector)
         {
-            return Matrix4x4.CreateFromYawPitchRoll(aVector.Y * (float)(Math.PI / 180), aVector.Z * (float)(Math.PI / 180), aVector.X * (float)(Math.PI / 180));
+            return Matrix4x4.CreateFromYawPitchRoll(
+                aVector.Y.ToRadians(),
+                aVector.X.ToRadians(),
+                aVector.Z.ToRadians());
         }
 
     }
