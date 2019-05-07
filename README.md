@@ -1,9 +1,9 @@
 ﻿# Empyrion Passenger
-## FAQ
+## Installation
+1. Download der aktuellen ZIP datei von https://github.com/GitHub-TC/EmpyrionPassenger/releases
+1. Upload der Datei im EWA (EmpyrionWebAccess) MOD oder händische installation mit dem ModLoader aus https://github.com/GitHub-TC/EmpyrionModHost
 
-Eine übersetzte Version findet ihr im EmpyrionPassenger/bin Verzeichnis falls ihr die Mod nicht selber prüfen und compilieren wollt ;-)
-
-Oder hier: https://empyriononline.com/threads/mod-empyrionpassenger.44246/
+Demo: https://empyriononline.com/threads/mod-empyrionpassenger.44246/
 
 ### Wo für ist das?
 
@@ -61,11 +61,12 @@ English-Version:
 
 ---
 
-## FAQ
+## Installation
+1. Download the current ZIP file from https://github.com/GitHub-TC/EmpyrionPassenger/releases
+1. Upload the file in the EWA (EmpyrionWebAccess) MOD or manual installation with the ModLoader from https://github.com/GitHub-TC/EmpyrionModHost
+You can find a compiled DLL version in the EmpyrionTeleporter/bin directory if you do not want to check and compile the mod myself ;-)
 
-You can find a translated version in the EmpyrionPassenger / bin directory if you do not want to check and compile the mod myself ;-)
-
-Or here: https://empyriononline.com/threads/mod-empyrionpassenger.44246/
+Demo: https://empyriononline.com/threads/mod-empyrionpassenger.44246/
 
 ### What is this?
 
