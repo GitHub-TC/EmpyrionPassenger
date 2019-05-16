@@ -72,24 +72,23 @@ namespace EmpyrionPassenger
         public override void Initialize(ModGameAPI aGameAPI)
         {
             GameAPI = aGameAPI;
-            verbose = true;
-            LogLevel = LogLevel.Message;
 
             log($"**HandleEmpyrionPassenger loaded: {string.Join(" ", Environment.GetCommandLineArgs())}", LogLevel.Message);
 
             InitializeDB();
+            LogLevel = PassengersDB.Configuration.Current.LogLevel;
 
             Event_Player_Connected += async (P) => await EmpyrionPassenger_Event_Player_Connected(P);
 
-            ChatCommands.Add(new ChatCommand(@"/pass",                           (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers als pilot of vessel"));
-            ChatCommands.Add(new ChatCommand(@"/pass (?<ID>\d+)",                (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers manually and if not pilot with vessel ID"));
-            ChatCommands.Add(new ChatCommand(@"/pass exec",                      (I, A) => ExecCommand(SubCommand.Teleport,  I, A), "Execute teleport"));
-            ChatCommands.Add(new ChatCommand(@"/pass help",                      (I, A) => ExecCommand(SubCommand.Help,      I, A), "Display help"));
-            ChatCommands.Add(new ChatCommand(@"/pass back",                      (I, A) => ExecCommand(SubCommand.Back,      I, A), "Teleports the player back to the last (good) position"));
-            ChatCommands.Add(new ChatCommand(@"/pass delete (?<ID>\d+)",         (I, A) => ExecCommand(SubCommand.Delete,    I, A), "Delete all teleportdata from {ID}"));
-            ChatCommands.Add(new ChatCommand(@"/pass list (?<ID>\d+)",           (I, A) => ExecCommand(SubCommand.List,      I, A), "List all teleportdata from {ID}"));
-            ChatCommands.Add(new ChatCommand(@"/pass listall",                   (I, A) => ExecCommand(SubCommand.ListAll,   I, A), "List all teleportdata", PermissionType.Moderator));
-            ChatCommands.Add(new ChatCommand(@"/pass cleanup",                   (I, A) => ExecCommand(SubCommand.CleanUp,   I, A), "Removes all teleportdata to deleted structures", PermissionType.Moderator));
+            ChatCommands.Add(new ChatCommand(@"\\pass",                           (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers als pilot of vessel"));
+            ChatCommands.Add(new ChatCommand(@"\\pass (?<ID>\d+)",                (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers manually and if not pilot with vessel ID"));
+            ChatCommands.Add(new ChatCommand(@"\\pass exec",                      (I, A) => ExecCommand(SubCommand.Teleport,  I, A), "Execute teleport"));
+            ChatCommands.Add(new ChatCommand(@"\\pass help",                      (I, A) => ExecCommand(SubCommand.Help,      I, A), "Display help"));
+            ChatCommands.Add(new ChatCommand(@"\\pass back",                      (I, A) => ExecCommand(SubCommand.Back,      I, A), "Teleports the player back to the last (good) position"));
+            ChatCommands.Add(new ChatCommand(@"\\pass delete (?<ID>\d+)",         (I, A) => ExecCommand(SubCommand.Delete,    I, A), "Delete all teleportdata from {ID}"));
+            ChatCommands.Add(new ChatCommand(@"\\pass list (?<ID>\d+)",           (I, A) => ExecCommand(SubCommand.List,      I, A), "List all teleportdata from {ID}"));
+            ChatCommands.Add(new ChatCommand(@"\\pass listall",                   (I, A) => ExecCommand(SubCommand.ListAll,   I, A), "List all teleportdata", PermissionType.Moderator));
+            ChatCommands.Add(new ChatCommand(@"\\pass cleanup",                   (I, A) => ExecCommand(SubCommand.CleanUp,   I, A), "Removes all teleportdata to deleted structures", PermissionType.Moderator));
         }
 
         private async Task EmpyrionPassenger_Event_Player_Connected(Id aPlayer)

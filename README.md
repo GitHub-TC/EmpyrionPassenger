@@ -18,24 +18,24 @@ Die Kommandos funktionieren NUR im Fraktionschat!
 
 #### Hilfe
 
-* /pass help : Zeigt die Kommandos der Mod an
+* \pass help : Zeigt die Kommandos der Mod an
 
 #### Teleport
 
-* /pass => Passagier einrichten wenn man auf Pilot des Schiffes ist
-* /pass <Id> => Passagier einrichten zu der Stuktur mit der <Id> - diese muss in der gleichen Fraktion sein
-* /pass help => Liste der Kommandos
-* /pass back => Falls ein Teleport schiefgegenen sein sollte kann sich der Spieler hiermit zu der Position VOR dem Teleport zurück teleportieren lassen
-* /pass delete <Id> => Löscht alle Passagierinformationen von zum Schiff <Id>
-* /pass list <Id> => Listet alle Passagiere von <Id> auf
-* /pass listall => Listet alle Passagierinformationen auf (nur ab Moderator erlaubt)
-* /pass cleanup => Löscht alle Passagierinformationen die zu gelöschten Strukturen führen (nur ab Moderator erlaubt)
+* \pass => Passagier einrichten wenn man auf Pilot des Schiffes ist
+* \pass <Id> => Passagier einrichten zu der Stuktur mit der <Id> - diese muss in der gleichen Fraktion sein
+* \pass help => Liste der Kommandos
+* \pass back => Falls ein Teleport schiefgegenen sein sollte kann sich der Spieler hiermit zu der Position VOR dem Teleport zurück teleportieren lassen
+* \pass delete <Id> => Löscht alle Passagierinformationen von zum Schiff <Id>
+* \pass list <Id> => Listet alle Passagiere von <Id> auf
+* \pass listall => Listet alle Passagierinformationen auf (nur ab Moderator erlaubt)
+* \pass cleanup => Löscht alle Passagierinformationen die zu gelöschten Strukturen führen (nur ab Moderator erlaubt)
 
 Beispiel:
 - Als Pilot des CV 4004: /pass
-- Als normaler Passagier des CV: /pass 4004
+- Als normaler Passagier des CV: \pass 4004
 
-Hinweis: Man kann sich aber auch in einem angedockten Schiff befinden und nur mit dem /pass Befehl seinen Passagierstatus anmelden
+Hinweis: Man kann sich aber auch in einem angedockten Schiff befinden und nur mit dem \pass Befehl seinen Passagierstatus anmelden
 
 ### Konfiguration
 Eine Konfiguration kann man in der Datei (wird beim ersten Start automatisch erstellt)
@@ -81,24 +81,24 @@ All commands only work in faction chat!
 
 #### Help
 
-* /pass help: Displays the commands of the mod
+* \pass help: Displays the commands of the mod
 
 #### Teleport
 
-* /pass => Passenger set up when piloting the ship
-* /pass <Id> => Passenger set up to the structure with the <Id> - this must be in the same faction
-* /pass help => list of commands
-* /pass back => If a teleport should be counterfeit, the player can be teleported back to the position BEFORE the teleport
-* /pass delete <Id> => Deletes all passenger information from to the ship <Id>
-* /pass list <Id> => Lists all passengers from <Id>
-* /pass listall => Lists all passenger information (only allowed from moderator)
-* /pass cleanup => Deletes all passenger information leading to deleted structures (only allowed from moderator)
+* \pass => Passenger set up when piloting the ship
+* \pass <Id> => Passenger set up to the structure with the <Id> - this must be in the same faction
+* \pass help => list of commands
+* \pass back => If a teleport should be counterfeit, the player can be teleported back to the position BEFORE the teleport
+* \pass delete <Id> => Deletes all passenger information from to the ship <Id>
+* \pass list <Id> => Lists all passengers from <Id>
+* \pass listall => Lists all passenger information (only allowed from moderator)
+* \pass cleanup => Deletes all passenger information leading to deleted structures (only allowed from moderator)
 
 Example:
 - As a pilot of the CV 4004: /pass
-- As a normal passenger of the CV: /pass 4004
+- As a normal passenger of the CV: \pass 4004
 
-Note: You can also be in a docked ship and register your passenger status only with the /pass command
+Note: You can also be in a docked ship and register your passenger status only with the \pass command
 
 ### Configuration
 A configuration can be found in the file (automatically created on first startup)

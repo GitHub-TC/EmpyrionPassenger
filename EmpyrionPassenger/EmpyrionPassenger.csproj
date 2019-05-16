@@ -38,8 +38,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="EmpyrionNetAPI, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\EmpyrionNetAPI.1.0.0\lib\net461\EmpyrionNetAPI.dll</HintPath>
+    <Reference Include="EmpyrionNetAPI, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\EmpyrionNetAPI.3.0.6\lib\net461\EmpyrionNetAPI.dll</HintPath>
     </Reference>
     <Reference Include="Mif">
       <HintPath>..\dependencies\Mif.dll</HintPath>
