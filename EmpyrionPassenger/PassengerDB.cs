@@ -55,7 +55,8 @@ namespace EmpyrionPassenger
         public class ConfigurationAndDB
         {
             [JsonConverter(typeof(StringEnumConverter))]
-            public LogLevel LogLevel { get; set; }
+            public LogLevel LogLevel { get; set; } = LogLevel.Message;
+            public string CommandPrefix { get; set; } = "/\\";
             public int PreparePlayerForTeleport { get; set; } = 10;
             public int HoldPlayerOnPositionAfterTeleport { get; set; } = 20;
             public AllowedStructure[] AllowedStructures { get; set; } = new AllowedStructure[]
