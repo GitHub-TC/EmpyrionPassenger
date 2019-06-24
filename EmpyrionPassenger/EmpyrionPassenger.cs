@@ -94,7 +94,14 @@ namespace EmpyrionPassenger
 
         private async Task EmpyrionPassenger_Event_Player_Connected(Id aPlayer)
         {
-            await TeleportPlayer(aPlayer.id);
+            try
+            {
+                await TeleportPlayer(aPlayer.id);
+            }
+            catch (Exception error)
+            {
+                log($"Event_Player_Connected: {error}", LogLevel.Error);
+            }
         }
 
         private void InitializeDB()
