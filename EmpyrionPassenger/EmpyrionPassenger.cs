@@ -12,6 +12,7 @@ using EmpyrionNetAPIDefinitions;
 using System.Threading.Tasks;
 using System.Numerics;
 using EmpyrionNetAPITools;
+using EmpyrionNetAPITools.Extensions;
 
 namespace EmpyrionPassenger
 {
@@ -73,13 +74,13 @@ namespace EmpyrionPassenger
         {
             GameAPI = aGameAPI;
 
-            log($"**HandleEmpyrionPassenger loaded: {string.Join(" ", Environment.GetCommandLineArgs())}", LogLevel.Message);
+            Log($"**HandleEmpyrionPassenger loaded: {string.Join(" ", Environment.GetCommandLineArgs())}", LogLevel.Message);
 
             InitializeDB();
             LogLevel = PassengersDB.Configuration.Current.LogLevel;
             ChatCommandManager.CommandPrefix = PassengersDB.Configuration.Current.CommandPrefix;
 
-            Event_Player_Connected += async (P) => await EmpyrionPassenger_Event_Player_Connected(P);
+            Event_Player_Connected += (P) => EmpyrionPassenger_Event_Player_Connected(P);
 
             ChatCommands.Add(new ChatCommand(@"pass",                           (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers als pilot of vessel"));
             ChatCommands.Add(new ChatCommand(@"pass (?<ID>\d+)",                (I, A) => ExecCommand(SubCommand.Save,      I, A), "Saves Passengers manually and if not pilot with vessel ID"));
@@ -92,7 +93,12 @@ namespace EmpyrionPassenger
             ChatCommands.Add(new ChatCommand(@"pass cleanup",                   (I, A) => ExecCommand(SubCommand.CleanUp,   I, A), "Removes all teleportdata to deleted structures", PermissionType.Moderator));
         }
 
-        private async Task EmpyrionPassenger_Event_Player_Connected(Id aPlayer)
+        private void EmpyrionPassenger_Event_Player_Connected(Id aPlayer)
+        {
+            TaskTools.Delay(60, () => CheckIfPlayerNeedsATeleport(aPlayer).Wait());
+        }
+
+        private async Task CheckIfPlayerNeedsATeleport(Id aPlayer)
         {
             try
             {
@@ -100,7 +106,7 @@ namespace EmpyrionPassenger
             }
             catch (Exception error)
             {
-                log($"Event_Player_Connected: {error}", LogLevel.Error);
+                Log($"Event_Player_Connected: {error}", LogLevel.Error);
             }
         }
 
@@ -108,7 +114,7 @@ namespace EmpyrionPassenger
         {
             PassengersDBFilename = Path.Combine(EmpyrionConfiguration.SaveGameModPath, "Passengers.json");
 
-            PassengerDB.LogDB = log;
+            PassengerDB.LogDB = Log;
             PassengersDB = new PassengerDB(PassengersDBFilename);
         }
 
@@ -121,7 +127,7 @@ namespace EmpyrionPassenger
 
         private async Task ExecCommand(SubCommand aCommand, ChatInfo info, Dictionary<string, string> args)
         {
-            log($"**HandleEmpyrionPassenger {info.type}#{aCommand}:{info.msg} {args.Aggregate("", (s, i) => s + i.Key + "/" + i.Value + " ")}", LogLevel.Message);
+            Log($"**HandleEmpyrionPassenger {info.type}#{aCommand}:{info.msg} {args.Aggregate("", (s, i) => s + i.Key + "/" + i.Value + " ")}", LogLevel.Message);
 
             if (info.type != (byte)ChatType.Faction) return;
 
@@ -147,7 +153,7 @@ namespace EmpyrionPassenger
 
             var DeleteList = TeleporterFlatIdList.Where(I => !GlobalFlatIdList.Contains(I)).Distinct();
             var DelCount = DeleteList.Aggregate(0, (C, I) => C + PassengersDB.Delete(I));
-            log($"CleanUpPassengers: {DelCount} Structures: {DeleteList.Aggregate("", (S, I) => S + "," + I)}", LogLevel.Message);
+            Log($"CleanUpPassengers: {DelCount} Structures: {DeleteList.Aggregate("", (S, I) => S + "," + I)}", LogLevel.Message);
             InformPlayer(aPlayerId, $"CleanUp: {DelCount} Passengers");
 
             if (DelCount > 0) PassengersDB.Configuration.Save();
@@ -156,7 +162,7 @@ namespace EmpyrionPassenger
         private async Task TeleportPlayer(int aPlayerId)
         {
             var G = await Request_GlobalStructure_List();
-            var P = await Request_Player_Info(aPlayerId.ToId());
+            var P = await Request_Player_Info(Timeouts.Wait1m, aPlayerId.ToId());
 
             await ExecTeleportPlayer(G, P, aPlayerId);
         }
@@ -175,14 +181,14 @@ namespace EmpyrionPassenger
                 .FirstOrDefault();
 
             if (PilotVessel.id == 0) {
-                log($"{P.playerName}({P.entityId}): Not pilot of a vessel!");
+                Log($"{P.playerName}({P.entityId}): Not pilot of a vessel!");
                 AlertPlayer(P.entityId, $"Not pilot of a vessel! Wait a minute or use '/pass [VesselID]'");
             }
             else
             {
                 PassengersDB.AddPassenderDestination(G, PilotVessel.id, P);
                 PassengersDB.Configuration.Save();
-                log($"{P.playerName}({P.entityId}): Passenger set to '{PilotVessel.name}' ({PilotVessel.id})");
+                Log($"{P.playerName}({P.entityId}): Passenger set to '{PilotVessel.name}' ({PilotVessel.id})");
                 await ShowDialog(aPlayerId, P, "Passengers", $"\nPassenger set to '{PilotVessel.name}' ({PilotVessel.id})");
             }
         }
@@ -219,19 +225,19 @@ namespace EmpyrionPassenger
             var FoundRoute = PassengersDB.SearchRoute(aGlobalStructureList, aPlayer);
             if (FoundRoute == null)
             {
-                log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> no logout vessel found for", LogLevel.Message);
+                Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> no logout vessel found for", LogLevel.Message);
                 return false;
             }
 
             if(Math.Abs(Vector3.Distance(FoundRoute.Position, GetVector3(aPlayer.pos))) <= 10)
             {
-                log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> near logout vessel pos={GetVector3(aPlayer.pos).String()} on '{aPlayer.playfield}'", LogLevel.Message);
+                Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> near logout vessel pos={GetVector3(aPlayer.pos).String()} on '{aPlayer.playfield}'", LogLevel.Message);
                 PassengersDB.DeletePassenger(aPlayer.entityId);
                 PassengersDB.Configuration.Save();
                 return false;
             }
 
-            log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}-> {FoundRoute.Id} on '{FoundRoute.Playfield}' pos={FoundRoute.Position.String()} rot={FoundRoute.Rotation.String()}", LogLevel.Message);
+            Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}-> {FoundRoute.Id} on '{FoundRoute.Playfield}' pos={FoundRoute.Position.String()} rot={FoundRoute.Rotation.String()}", LogLevel.Message);
 
             if (!PlayerLastGoodPosition.ContainsKey(aPlayer.entityId)) PlayerLastGoodPosition.Add(aPlayer.entityId, null);
             PlayerLastGoodPosition[aPlayer.entityId] = new IdPlayfieldPositionRotation(aPlayer.entityId, aPlayer.playfield, aPlayer.pos, aPlayer.rot);
@@ -339,7 +345,7 @@ namespace EmpyrionPassenger
 
         private void LogError(string aPrefix, ErrorInfo aError)
         {
-            log($"{aPrefix} Error: {aError.errorType} {aError.ToString()}", LogLevel.Error);
+            Log($"{aPrefix} Error: {aError.errorType} {aError.ToString()}", LogLevel.Error);
         }
 
         private int getIntParam(Dictionary<string, string> aArgs, string aParameterName)
