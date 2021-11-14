@@ -59,6 +59,8 @@ namespace EmpyrionPassenger
             public string CommandPrefix { get; set; } = "/\\";
             public int PreparePlayerForTeleport { get; set; } = 10;
             public int HoldPlayerOnPositionAfterTeleport { get; set; } = 20;
+            public float NoTeleportNearVesselDistance { get; set; } = 10;
+            public int HealthPack { get; set; } = 4437;
             public AllowedStructure[] AllowedStructures { get; set; } = new AllowedStructure[]
                 {
                 new AllowedStructure(){ EntityType = EntityType.HV },

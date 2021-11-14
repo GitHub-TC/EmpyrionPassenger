@@ -229,7 +229,7 @@ namespace EmpyrionPassenger
                 return false;
             }
 
-            if(Math.Abs(Vector3.Distance(FoundRoute.Position, GetVector3(aPlayer.pos))) <= 10)
+            if(Math.Abs(Vector3.Distance(FoundRoute.Position, GetVector3(aPlayer.pos))) <= PassengersDB.Configuration.Current.NoTeleportNearVesselDistance)
             {
                 Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> near logout vessel pos={GetVector3(aPlayer.pos).String()} on '{aPlayer.playfield}'", LogLevel.Message);
                 PassengersDB.DeletePassenger(aPlayer.entityId);
@@ -251,7 +251,7 @@ namespace EmpyrionPassenger
                     }
                     catch (Exception error)
                     {
-                        InformPlayer(aPlayerId, $"Entity_Teleport: {error}");
+                        InformPlayer(aPlayerId, $"Entity_Teleport: {error.Message}");
                     }
                 else
                 {
@@ -261,12 +261,19 @@ namespace EmpyrionPassenger
                     }
                     catch (Exception error)
                     {
-                        InformPlayer(aPlayerId, $"Player_ChangePlayerfield: {error}");
+                        InformPlayer(aPlayerId, $"Player_ChangePlayerfield: {error.Message}");
                     }
                 }
             };
 
-            await Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aPlayer.entityId, health = (int)aPlayer.healthMax });
+            try
+            {
+                await Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aPlayer.entityId, health = (int)aPlayer.healthMax });
+            }
+            catch (Exception error)
+            {
+                InformPlayer(aPlayerId, $"Player_SetHealth: {error.Message}");
+            }
 
             new Thread(new ThreadStart(() =>
             {
@@ -274,9 +281,9 @@ namespace EmpyrionPassenger
                 TryTimer.Start();
                 while (TryTimer.ElapsedMilliseconds < (PassengersDB.Configuration.Current.PreparePlayerForTeleport * 1000))
                 {
-                    Thread.Sleep(2000);
                     var WaitTime = PassengersDB.Configuration.Current.PreparePlayerForTeleport - (int)(TryTimer.ElapsedMilliseconds / 1000);
-                    InformPlayer(aPlayerId, $"Prepare for teleport in {WaitTime} sec.");
+                    InformPlayer(aPlayerId, WaitTime > 1 ? $"Prepare for teleport in {WaitTime} sec." : $"Prepare for teleport now.");
+                    if (WaitTime > 0) Thread.Sleep(2000);
                 }
 
                 ActionTeleportPlayer(aPlayer);
@@ -292,27 +299,38 @@ namespace EmpyrionPassenger
         {
             new Thread(new ThreadStart(async () =>
             {
-                PlayerInfo LastPlayerInfo = aCurrentPlayerInfo;
-                var TryTimer = new Stopwatch();
-                TryTimer.Start();
-                while (TryTimer.ElapsedMilliseconds < (PassengersDB.Configuration.Current.HoldPlayerOnPositionAfterTeleport * 1000))
+                try
                 {
-                    Thread.Sleep(2000);
-                    var WaitTime = PassengersDB.Configuration.Current.HoldPlayerOnPositionAfterTeleport - (int)(TryTimer.ElapsedMilliseconds / 1000);
-                    try
+                    PlayerInfo LastPlayerInfo = aCurrentPlayerInfo;
+
+                    await Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aCurrentPlayerInfo.entityId, health = (int)aCurrentPlayerInfo.healthMax });
+                    if (PassengersDB.Configuration.Current.HealthPack > 0) await Request_Player_AddItem(new IdItemStack(aCurrentPlayerInfo.entityId, new ItemStack(PassengersDB.Configuration.Current.HealthPack, 1))); // Bandages ;-)
+
+                    var TryTimer = new Stopwatch();
+                    TryTimer.Start();
+                    while (TryTimer.ElapsedMilliseconds < (PassengersDB.Configuration.Current.HoldPlayerOnPositionAfterTeleport * 1000))
                     {
-                        var P = await Request_Player_Info(aPlayerId.ToId());
-                        LastPlayerInfo = P;
-                        if (WaitTime > 0) InformPlayer(aPlayerId, $"Target reached please wait for {WaitTime} sec.");
+                        Thread.Sleep(2000);
+                        var WaitTime = PassengersDB.Configuration.Current.HoldPlayerOnPositionAfterTeleport - (int)(TryTimer.ElapsedMilliseconds / 1000);
+                        try
+                        {
+                            var P = await Request_Player_Info(aPlayerId.ToId());
+                            LastPlayerInfo = P;
+                            if (WaitTime > 0) InformPlayer(aPlayerId, $"Target reached please wait for {WaitTime} sec.");
+                        }
+                        catch (Exception error)
+                        {
+                            InformPlayer(aPlayerId, $"Target reached. {error}");
+                        }
                     }
-                    catch (Exception error)
-                    {
-                        InformPlayer(aPlayerId, $"Target reached. {error}");
-                    }
+                    if (Vector3.Distance(GetVector3(LastPlayerInfo.pos), aTargetPos) > 3) ActionTeleportPlayer(LastPlayerInfo);
+                    await Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aCurrentPlayerInfo.entityId, health = (int)aCurrentPlayerInfo.healthMax });
+                    InformPlayer(aPlayerId, $"Thank you for traveling with the EmpyrionPassenger :-)");
                 }
-                if (Vector3.Distance(GetVector3(LastPlayerInfo.pos), aTargetPos) > 3) ActionTeleportPlayer(LastPlayerInfo);
-                await Request_Player_SetPlayerInfo(new PlayerInfoSet() { entityId = aCurrentPlayerInfo.entityId, health = (int)aCurrentPlayerInfo.healthMax });
-                InformPlayer(aPlayerId, $"Thank you for traveling with the EmpyrionPassenger :-)");
+                catch (Exception error)
+                {
+                    Log($"CheckPlayerStableTargetPos: {error}", LogLevel.Error);
+                }
             })).Start();
         }
 
