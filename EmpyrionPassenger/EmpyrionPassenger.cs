@@ -95,7 +95,10 @@ namespace EmpyrionPassenger
 
         private void EmpyrionPassenger_Event_Player_Connected(Id aPlayer)
         {
-            TaskTools.Delay(60, () => CheckIfPlayerNeedsATeleport(aPlayer).Wait());
+            Task.Run(async () => {
+                await Task.Delay(PassengersDB.Configuration.Current.SecDelayAfterPlayerEnterTheGame * 1000);
+                await CheckIfPlayerNeedsATeleport(aPlayer);
+            });
         }
 
         private async Task CheckIfPlayerNeedsATeleport(Id aPlayer)
@@ -222,14 +225,14 @@ namespace EmpyrionPassenger
 
         private async Task<bool> ExecTeleportPlayer(GlobalStructureList aGlobalStructureList, PlayerInfo aPlayer, int aPlayerId)
         {
-            var FoundRoute = PassengersDB.SearchRoute(aGlobalStructureList, aPlayer);
-            if (FoundRoute == null)
+            var FoundDestination = PassengersDB.SearchRoute(aGlobalStructureList, aPlayer);
+            if (FoundDestination == null)
             {
                 Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> no logout vessel found for", LogLevel.Message);
                 return false;
             }
 
-            if(Math.Abs(Vector3.Distance(FoundRoute.Position, GetVector3(aPlayer.pos))) <= PassengersDB.Configuration.Current.NoTeleportNearVesselDistance)
+            if(Math.Abs(Vector3.Distance(FoundDestination.Position, GetVector3(aPlayer.pos))) <= PassengersDB.Configuration.Current.NoTeleportNearVesselDistance)
             {
                 Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}/{aPlayer.clientId} -> near logout vessel pos={GetVector3(aPlayer.pos).String()} on '{aPlayer.playfield}'", LogLevel.Message);
                 PassengersDB.DeletePassenger(aPlayer.entityId);
@@ -237,17 +240,17 @@ namespace EmpyrionPassenger
                 return false;
             }
 
-            Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}-> {FoundRoute.Id} on '{FoundRoute.Playfield}' pos={FoundRoute.Position.String()} rot={FoundRoute.Rotation.String()}", LogLevel.Message);
+            Log($"EmpyrionPassenger: Exec: {aPlayer.playerName}/{aPlayer.entityId}-> {FoundDestination.Id} on '{FoundDestination.Playfield}' pos={FoundDestination.Position.String()} rot={FoundDestination.Rotation.String()}", LogLevel.Message);
 
             if (!PlayerLastGoodPosition.ContainsKey(aPlayer.entityId)) PlayerLastGoodPosition.Add(aPlayer.entityId, null);
             PlayerLastGoodPosition[aPlayer.entityId] = new IdPlayfieldPositionRotation(aPlayer.entityId, aPlayer.playfield, aPlayer.pos, aPlayer.rot);
 
             Action<PlayerInfo> ActionTeleportPlayer = async (P) =>
             {
-                if (FoundRoute.Playfield == P.playfield)
+                if (FoundDestination.Playfield == P.playfield)
                     try
                     {
-                        await Request_Entity_Teleport(new IdPositionRotation(aPlayer.entityId, GetVector3(FoundRoute.Position), GetVector3(FoundRoute.Rotation)));
+                        await Request_Entity_Teleport(new IdPositionRotation(aPlayer.entityId, GetVector3(FoundDestination.Position), GetVector3(FoundDestination.Rotation)));
                     }
                     catch (Exception error)
                     {
@@ -257,7 +260,7 @@ namespace EmpyrionPassenger
                 {
                     try
                     {
-                        await Request_Player_ChangePlayerfield(new IdPlayfieldPositionRotation(aPlayer.entityId, FoundRoute.Playfield, GetVector3(FoundRoute.Position), GetVector3(FoundRoute.Rotation)));
+                        await Request_Player_ChangePlayerfield(new IdPlayfieldPositionRotation(aPlayer.entityId, FoundDestination.Playfield, GetVector3(FoundDestination.Position), GetVector3(FoundDestination.Rotation)));
                     }
                     catch (Exception error)
                     {
@@ -287,7 +290,7 @@ namespace EmpyrionPassenger
                 }
 
                 ActionTeleportPlayer(aPlayer);
-                CheckPlayerStableTargetPos(aPlayerId, aPlayer, ActionTeleportPlayer, FoundRoute.Position);
+                CheckPlayerStableTargetPos(aPlayerId, aPlayer, ActionTeleportPlayer, FoundDestination.Position);
                 PassengersDB.DeletePassenger(aPlayer.entityId);
                 PassengersDB.Configuration.Save();
             })).Start();

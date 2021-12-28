@@ -60,6 +60,7 @@ namespace EmpyrionPassenger
             public int PreparePlayerForTeleport { get; set; } = 10;
             public int HoldPlayerOnPositionAfterTeleport { get; set; } = 20;
             public float NoTeleportNearVesselDistance { get; set; } = 10;
+            public int SecDelayAfterPlayerEnterTheGame { get; set; } = 60;
             public int HealthPack { get; set; } = 4437;
             public AllowedStructure[] AllowedStructures { get; set; } = new AllowedStructure[]
                 {
