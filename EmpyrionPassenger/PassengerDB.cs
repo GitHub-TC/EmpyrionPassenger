@@ -1,15 +1,13 @@
 ﻿using System;
 using Eleon.Modding;
 using System.Collections.Generic;
-using System.IO;
-using System.Xml.Serialization;
-using System.Xml;
 using System.Linq;
 using System.Numerics;
 using EmpyrionNetAPIDefinitions;
 using EmpyrionNetAPITools;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using System.Threading.Tasks;
 
 namespace EmpyrionPassenger
 {
@@ -34,12 +32,12 @@ namespace EmpyrionPassenger
 
             public override string ToString()
             {
-                return $"{PassengerName}/{PassengerId}: {Destination.ToString()}";
+                return $"{PassengerName}/{PassengerId}: {Destination}";
             }
 
-            public string ToString(GlobalStructureList G)
+            public string ToInfoString()
             {
-                var Sa = SearchEntity(G, Destination.Id);
+                var Sa = SearchEntity(Destination.Id).GetAwaiter().GetResult();
 
                 return $"[c][ff0000]{PassengerName}/{PassengerId}[-][/c]: " +
                        (Sa == null ? Destination.ToString() : $"[c][ff00ff]{Sa.Data.name}[-][/c] [[c][ffffff]{Sa.Data.id}[-][/c]/[c][ffffff]{Sa.Playfield}[-][/c]]");
@@ -51,6 +49,8 @@ namespace EmpyrionPassenger
             [JsonConverter(typeof(StringEnumConverter))]
             public EntityType EntityType { get; set; }
         }
+
+        public static EmpyrionPassenger ModAccess { get; internal set; }
 
         public class ConfigurationAndDB
         {
@@ -99,9 +99,9 @@ namespace EmpyrionPassenger
             LogDB?.Invoke(aText, aLevel);
         }
 
-        public void AddPassenderDestination(GlobalStructureList aGlobalStructureList, int aVesselId, PlayerInfo aPlayer)
+        public async Task AddPassenderDestination(int aVesselId, PlayerInfo aPlayer)
         {
-            var FoundEntity = SearchEntity(aGlobalStructureList, aVesselId);
+            var FoundEntity = await SearchEntity(aVesselId);
             if (FoundEntity == null) return;
 
             var RelativePos = GetVector3(aPlayer.pos) - GetVector3(FoundEntity.Data.pos);
@@ -128,13 +128,11 @@ namespace EmpyrionPassenger
             public GlobalStructureInfo Data { get; set; }
         }
 
-        public static PlayfieldStructureInfo SearchEntity(GlobalStructureList aGlobalStructureList, int aSourceId)
+        public static async Task<PlayfieldStructureInfo> SearchEntity(int aSourceId)
         {
-            foreach (var TestPlayfieldEntites in aGlobalStructureList.globalStructures)
-            {
-                var FoundEntity = TestPlayfieldEntites.Value.FirstOrDefault(E => E.id == aSourceId);
-                if (FoundEntity.id != 0) return new PlayfieldStructureInfo() { Playfield = TestPlayfieldEntites.Key, Data = FoundEntity };
-            }
+            var FoundEntity = await ModAccess.Request_GlobalStructure_Info(new Id(aSourceId));
+            if (FoundEntity.id != 0) return new PlayfieldStructureInfo() { Playfield = FoundEntity.PlayfieldName, Data = FoundEntity };
+
             return null;
         }
 
@@ -163,9 +161,9 @@ namespace EmpyrionPassenger
             return Configuration.Current.PassengersDestinations.Where(T => (T.Destination.Id == aStructureId));
         }
 
-        TeleporterTargetData GetCurrentTeleportTargetPosition(GlobalStructureList aGlobalStructureList, TeleporterData aTarget)
+        async Task<TeleporterTargetData> GetCurrentTeleportTargetPosition(TeleporterData aTarget)
         {
-            var StructureInfo = SearchEntity(aGlobalStructureList, aTarget.Id);
+            var StructureInfo = await SearchEntity(aTarget.Id);
             if (StructureInfo == null)
             {
                 log($"TargetStructure missing:{aTarget.Id} pos={aTarget.Position.String()}", LogLevel.Error);
@@ -186,13 +184,13 @@ namespace EmpyrionPassenger
             return aVector.x == 0 && aVector.y == 0 && aVector.z == 0;
         }
 
-        public TeleporterTargetData SearchRoute(GlobalStructureList aGlobalStructureList, PlayerInfo aPlayer)
+        public async Task<TeleporterTargetData> SearchRoute(PlayerInfo aPlayer)
         {
             //log($"T:{TeleporterRoutes.Aggregate("", (s, t) => s + " " + t.ToString())} => {aGlobalStructureList.globalStructures.Aggregate("", (s, p) => s + p.Key + ":" + p.Value.Aggregate("", (ss, pp) => ss + " " + pp.id + "/" + pp.name))}");
 
-            return Configuration.Current.PassengersDestinations
+            return await Configuration.Current.PassengersDestinations
                 .Where(D => D.PassengerId == aPlayer.entityId)
-                .Select(I => GetCurrentTeleportTargetPosition(aGlobalStructureList, I.Destination))
+                .Select(async I => await GetCurrentTeleportTargetPosition(I.Destination))
                 .FirstOrDefault();
         }
 
