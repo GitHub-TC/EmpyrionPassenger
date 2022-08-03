@@ -109,7 +109,7 @@ namespace EmpyrionPassenger
             }
             catch (Exception error)
             {
-                Log($"Event_Player_Connected(CheckIfPlayerNeedsATeleport:{aPlayer}): {error}", LogLevel.Error);
+                Log($"Event_Player_Connected(CheckIfPlayerNeedsATeleport:{aPlayer.id}): {error}", LogLevel.Error);
             }
         }
 
@@ -167,9 +167,17 @@ namespace EmpyrionPassenger
 
         private async Task TeleportPlayer(int aPlayerId)
         {
-            var P = await Request_Player_Info(Timeouts.Wait1m, aPlayerId.ToId());
+            try
+            {
+                var P = await Request_Player_Info(Timeouts.Wait1m, aPlayerId.ToId());
 
-            await ExecTeleportPlayer(P, aPlayerId);
+                if (P != null) await ExecTeleportPlayer(P, aPlayerId);
+                else           Log($"Player {aPlayerId} not found.", LogLevel.Message);
+            }
+            catch (Exception error)
+            {
+                Log($"TeleportPlayer:{error}", LogLevel.Error);
+            }
         }
 
         private async Task SavePassengersDestination(int aPlayerId, int aVesselId)

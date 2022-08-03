@@ -163,20 +163,29 @@ namespace EmpyrionPassenger
 
         async Task<TeleporterTargetData> GetCurrentTeleportTargetPosition(TeleporterData aTarget)
         {
-            var StructureInfo = await SearchEntity(aTarget.Id);
-            if (StructureInfo == null)
+            PlayfieldStructureInfo StructureInfo = null;
+            try
             {
-                log($"TargetStructure missing:{aTarget.Id} pos={aTarget.Position.String()}", LogLevel.Error);
+                StructureInfo = await SearchEntity(aTarget.Id);
+                if (StructureInfo == null)
+                {
+                    log($"TargetStructure missing:{aTarget.Id} pos={aTarget.Position.String()}", LogLevel.Error);
+                    return null;
+                }
+
+                var StructureInfoRot  = GetVector3(StructureInfo.Data.rot);
+                var StructureRotation = GetMatrix4x4(StructureInfoRot);
+                var TeleportTargetPos = Vector3.Transform(aTarget.Position, StructureRotation) + GetVector3(StructureInfo.Data.pos);
+
+                log($"CurrentPassengerTargetPosition:{StructureInfo.Data.id}/{(EntityType)StructureInfo.Data.type} pos={StructureInfo.Data.pos.String()} TeleportPos={TeleportTargetPos.String()}", LogLevel.Message);
+
+                return new TeleporterTargetData() { Id = aTarget.Id, Playfield = StructureInfo.Playfield, Position = TeleportTargetPos, Rotation = aTarget.Rotation + StructureInfoRot};
+            }
+            catch (Exception error)
+            {
+                log($"GetCurrentTeleportTargetPosition:{aTarget?.Id}:{StructureInfo?.Data}->{error}", LogLevel.Error);
                 return null;
             }
-
-            var StructureInfoRot  = GetVector3(StructureInfo.Data.rot);
-            var StructureRotation = GetMatrix4x4(StructureInfoRot);
-            var TeleportTargetPos = Vector3.Transform(aTarget.Position, StructureRotation) + GetVector3(StructureInfo.Data.pos);
-
-            log($"CurrentPassengerTargetPosition:{StructureInfo.Data.id}/{(EntityType)StructureInfo.Data.type} pos={StructureInfo.Data.pos.String()} TeleportPos={TeleportTargetPos.String()}", LogLevel.Message);
-
-            return new TeleporterTargetData() { Id = aTarget.Id, Playfield = StructureInfo.Playfield, Position = TeleportTargetPos, Rotation = aTarget.Rotation + StructureInfoRot};
         }
 
         bool IsZero(PVector3 aVector)
@@ -186,12 +195,19 @@ namespace EmpyrionPassenger
 
         public async Task<TeleporterTargetData> SearchRoute(PlayerInfo aPlayer)
         {
-            //log($"T:{TeleporterRoutes.Aggregate("", (s, t) => s + " " + t.ToString())} => {aGlobalStructureList.globalStructures.Aggregate("", (s, p) => s + p.Key + ":" + p.Value.Aggregate("", (ss, pp) => ss + " " + pp.id + "/" + pp.name))}");
+            try
+            {
+                var foundPassenger = Configuration.Current?.PassengersDestinations?
+                    .Where(D => D.PassengerId == aPlayer.entityId)
+                    .FirstOrDefault();
 
-            return await Configuration.Current.PassengersDestinations
-                .Where(D => D.PassengerId == aPlayer.entityId)
-                .Select(async I => await GetCurrentTeleportTargetPosition(I.Destination))
-                .FirstOrDefault();
+                return foundPassenger == null ? null : await GetCurrentTeleportTargetPosition(foundPassenger.Destination);
+            }
+            catch (Exception error)
+            {
+                log($"SearchRoute:{aPlayer?.entityId} [{Configuration.ConfigFilename}:{Configuration.Current?.PassengersDestinations?.Count}]->{error}", LogLevel.Error);
+                return null;
+            }
         }
 
         public static Vector3 GetVector3(PVector3 aVector)
