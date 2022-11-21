@@ -206,16 +206,29 @@ namespace EmpyrionPassenger
                 }
             }
 
-            if (PilotVessel.id == 0 || (PilotVessel.factionId != P.factionId && P.permission < (int)PermissionType.Moderator)) {
-                Log($"{P.playerName}({P.entityId}): Not pilot of a vessel!");
-                AlertPlayer(P.entityId, $"Not pilot of a vessel! Wait a minute or use '/pass [VesselID]'");
+            if (PilotVessel.id == 0) {
+                if (aVesselId == 0)
+                {
+                    Log($"{P.playerName}({P.entityId}): Not pilot of a vessel found!");
+                    AlertPlayer(P.entityId, $"Not pilot of a vessel found! Wait a minute or use '/pass [VesselID]'");
+                }
+                else
+                {
+                    Log($"{P.playerName}({P.entityId}): vessel {aVesselId} not found");
+                    AlertPlayer(P.entityId, $"{P.playerName}({P.entityId}): vessel {aVesselId} not found");
+                }
+            }
+            else if (PilotVessel.factionId != P.factionId && P.permission < (int)PermissionType.Moderator)
+            {
+                Log($"{P.playerName}({P.entityId}): vessel '{PilotVessel.name}' [{PilotVessel.id}] has different faction!");
+                AlertPlayer(P.entityId, $"{P.playerName}({P.entityId}): vessel '{PilotVessel.name}' [{PilotVessel.id}] has different faction!");
             }
             else
             {
                 await PassengersDB.AddPassenderDestination(aVesselId, P);
                 PassengersDB.Configuration.Save();
-                Log($"{P.playerName}({P.entityId}): Passenger set to '{PilotVessel.name}' ({PilotVessel.id})");
-                await ShowDialog(aPlayerId, P, "Passengers", $"\nPassenger set to '{PilotVessel.name}' ({PilotVessel.id})");
+                Log($"{P.playerName}({P.entityId}): Passenger set to '{PilotVessel.name}' [{PilotVessel.id}]");
+                await ShowDialog(aPlayerId, P, "Passengers", $"\nPassenger set to '{PilotVessel.name}' [{PilotVessel.id}]");
             }
         }
 
